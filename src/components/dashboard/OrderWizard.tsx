@@ -5,9 +5,8 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { ChevronRight, ChevronLeft, Upload, Search, Plus, Minus, ChevronDown, ChevronUp } from "lucide-react";
+import { ChevronRight, ChevronLeft, Upload, Plus, Minus, ChevronDown, ChevronUp } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Checkbox } from "@/components/ui/checkbox";
 
 interface AllocationFormProps {
@@ -222,24 +221,26 @@ interface Step {
 }
 
 const steps: Step[] = [
-  { id: 1, title: "Select PO", description: "Choose Purchase Order" },
+  { id: 1, title: "Upload Excel", description: "Upload Excel file" },
   { id: 2, title: "Tag Details", description: "Configure SKU tags" },
   { id: 3, title: "Address Allocation", description: "Allocate to addresses" },
   { id: 4, title: "Review & Confirm", description: "Final review" },
 ];
 
-// Mock data
-const mockPOs = [
-  { id: "PO-2024-001", supplier: "Fashion Co.", date: "2024-01-15", value: "$12,500" },
-  { id: "PO-2024-002", supplier: "Textile Ltd.", date: "2024-01-18", value: "$8,900" },
-  { id: "PO-2024-003", supplier: "Garment Pro", date: "2024-01-20", value: "$15,200" },
-];
-
-const mockSKUs = [
-  { code: "SKU-001", description: "Cotton T-Shirt Blue M", ordered: 100, unitPrice: 12.50 },
-  { code: "SKU-002", description: "Cotton T-Shirt Blue L", ordered: 80, unitPrice: 12.50 },
-  { code: "SKU-003", description: "Cotton T-Shirt Red M", ordered: 60, unitPrice: 12.50 },
-];
+// Excel data interface
+interface ExcelRow {
+  MRP: string;
+  Size: string;
+  "Met Size": string;
+  COLOR: string;
+  "Style Code": string;
+  "Variant Article Number": string;
+  DESC: string;
+  "YR MONTH": string;
+  "po number": string;
+  EAN: string;
+  QTY: string;
+}
 
 const mockAddresses = [
   { id: 1, name: "Warehouse A", address: "123 Main St, New York, NY 10001" },
@@ -249,24 +250,23 @@ const mockAddresses = [
 
 export function OrderWizard() {
   const [currentStep, setCurrentStep] = useState(1);
-  const [inputMethod, setInputMethod] = useState("search"); // "search" or "upload"
-  const [selectedPO, setSelectedPO] = useState("");
-  const [poSearchQuery, setPOSearchQuery] = useState("");
-  const [selectedSKUs, setSelectedSKUs] = useState<Record<string, boolean>>({});
-  const [skuQuantities, setSKUQuantities] = useState<Record<string, number>>({});
-  const [skuOverheads, setSKUOverheads] = useState<Record<string, number>>({});
-  const [skuSplitRequired, setSKUSplitRequired] = useState<Record<string, boolean>>({});
+  const [uploadedFile, setUploadedFile] = useState<File | null>(null);
+  const [excelData, setExcelData] = useState<ExcelRow[]>([]);
+  const [selectedRows, setSelectedRows] = useState<Record<number, boolean>>({});
+  const [rowTagQuantities, setRowTagQuantities] = useState<Record<number, number>>({});
+  const [rowOverheads, setRowOverheads] = useState<Record<number, number>>({});
+  const [rowSplitRequired, setRowSplitRequired] = useState<Record<number, boolean>>({});
   const [shipToMultipleAddresses, setShipToMultipleAddresses] = useState(false);
   const [singleAddress, setSingleAddress] = useState(1);
-  const [skuSingleAddresses, setSKUSingleAddresses] = useState<Record<string, number>>({});
-  const [skuAddressAllocations, setSKUAddressAllocations] = useState<Record<string, Record<number, number>>>({});
+  const [rowSingleAddresses, setRowSingleAddresses] = useState<Record<number, number>>({});
+  const [rowAddressAllocations, setRowAddressAllocations] = useState<Record<number, Record<number, number>>>({});
   
   const selectAllRef = useRef<HTMLButtonElement>(null);
 
   // Handle indeterminate state for select all checkbox
   useEffect(() => {
-    const allSelected = mockSKUs.every(sku => selectedSKUs[sku.code]);
-    const someSelected = mockSKUs.some(sku => selectedSKUs[sku.code]);
+    const allSelected = excelData.every((_, index) => selectedRows[index]);
+    const someSelected = excelData.some((_, index) => selectedRows[index]);
     
     if (selectAllRef.current) {
       const checkbox = selectAllRef.current.querySelector('input[type="checkbox"]') as HTMLInputElement;
@@ -274,7 +274,34 @@ export function OrderWizard() {
         checkbox.indeterminate = someSelected && !allSelected;
       }
     }
-  }, [selectedSKUs]);
+  }, [selectedRows, excelData]);
+
+  const handleFileUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (file) {
+      setUploadedFile(file);
+      // In a real implementation, you would parse the Excel file here
+      // For now, we'll simulate with mock data based on the CSV structure
+      const mockExcelData: ExcelRow[] = [
+        { MRP: "2299", Size: "S", "Met Size": "38 cm", COLOR: "DK. BROWN", "Style Code": "AAW25ZC CWAT6507", "Variant Article Number": "443084681001", DESC: "AZORTE SHIRTS", "YR MONTH": "23-08-2025", "po number": "abc-1", EAN: "8909255816959", QTY: "80" },
+        { MRP: "2299", Size: "S", "Met Size": "38 cm", COLOR: "DK. BROWN", "Style Code": "AAW25ZC CWAT6507", "Variant Article Number": "443084681002", DESC: "AZORTE SHIRTS", "YR MONTH": "23-08-2025", "po number": "abc-2", EAN: "8909255816942", QTY: "90" },
+        { MRP: "2299", Size: "M", "Met Size": "40 cm", COLOR: "DK. BROWN", "Style Code": "AAW25ZC CWAT6507", "Variant Article Number": "443084681003", DESC: "AZORTE SHIRTS", "YR MONTH": "23-08-2025", "po number": "abc-3", EAN: "8909255816935", QTY: "100" },
+        { MRP: "2299", Size: "L", "Met Size": "42 cm", COLOR: "DK. BROWN", "Style Code": "AAW25ZC CWAT6507", "Variant Article Number": "443084681004", DESC: "AZORTE SHIRTS", "YR MONTH": "24-08-2025", "po number": "abc-4", EAN: "8909255816966", QTY: "120" },
+        { MRP: "2299", Size: "XL", "Met Size": "44 cm", COLOR: "DK. BROWN", "Style Code": "AAW25ZC CWAT6507", "Variant Article Number": "443084681005", DESC: "AZORTE SHIRTS", "YR MONTH": "25-08-2025", "po number": "abc-5", EAN: "8909255816973", QTY: "150" },
+      ];
+      setExcelData(mockExcelData);
+      
+      // Initialize default values for each row
+      const defaultSelected: Record<number, boolean> = {};
+      const defaultOverheads: Record<number, number> = {};
+      mockExcelData.forEach((_, index) => {
+        defaultSelected[index] = false;
+        defaultOverheads[index] = 2; // Default 2% overhead
+      });
+      setSelectedRows(defaultSelected);
+      setRowOverheads(defaultOverheads);
+    }
+  };
 
   const handleNext = () => {
     if (currentStep < steps.length) {
@@ -289,88 +316,83 @@ export function OrderWizard() {
   };
 
   const toggleSelectAll = () => {
-    const allSelected = mockSKUs.every(sku => selectedSKUs[sku.code]);
-    const newSelectedSKUs: Record<string, boolean> = {};
-    mockSKUs.forEach(sku => {
-      newSelectedSKUs[sku.code] = !allSelected;
+    const allSelected = excelData.every((_, index) => selectedRows[index]);
+    const newSelectedRows: Record<number, boolean> = {};
+    excelData.forEach((_, index) => {
+      newSelectedRows[index] = !allSelected;
     });
-    setSelectedSKUs(newSelectedSKUs);
+    setSelectedRows(newSelectedRows);
   };
 
-  const toggleSKU = (skuCode: string) => {
-    setSelectedSKUs(prev => ({
+  const toggleRow = (rowIndex: number) => {
+    setSelectedRows(prev => ({
       ...prev,
-      [skuCode]: !prev[skuCode]
+      [rowIndex]: !prev[rowIndex]
     }));
   };
 
-  const updateSKUQuantity = (skuCode: string, quantity: number) => {
-    setSKUQuantities(prev => ({
+  const updateRowTagQuantity = (rowIndex: number, quantity: number) => {
+    setRowTagQuantities(prev => ({
       ...prev,
-      [skuCode]: quantity
+      [rowIndex]: quantity
     }));
   };
 
-  const updateSKUOverhead = (skuCode: string, overhead: number) => {
-    setSKUOverheads(prev => ({
+  const updateRowOverhead = (rowIndex: number, overhead: number) => {
+    setRowOverheads(prev => ({
       ...prev,
-      [skuCode]: overhead
+      [rowIndex]: overhead
     }));
   };
 
-  const toggleSKUSplitRequired = (skuCode: string) => {
-    setSKUSplitRequired(prev => ({
+  const toggleRowSplitRequired = (rowIndex: number) => {
+    setRowSplitRequired(prev => ({
       ...prev,
-      [skuCode]: !prev[skuCode]
+      [rowIndex]: !prev[rowIndex]
     }));
   };
 
-  const updateSKUSingleAddress = (skuCode: string, addressId: number) => {
-    setSKUSingleAddresses(prev => ({
+  const updateRowSingleAddress = (rowIndex: number, addressId: number) => {
+    setRowSingleAddresses(prev => ({
       ...prev,
-      [skuCode]: addressId
+      [rowIndex]: addressId
     }));
   };
 
-  const updateSKUAddressAllocation = (skuCode: string, addressId: number, quantity: number) => {
-    setSKUAddressAllocations(prev => ({
+  const updateRowAddressAllocation = (rowIndex: number, addressId: number, quantity: number) => {
+    setRowAddressAllocations(prev => ({
       ...prev,
-      [skuCode]: {
-        ...prev[skuCode],
+      [rowIndex]: {
+        ...prev[rowIndex],
         [addressId]: quantity
       }
     }));
   };
 
-  const getSKUAllocationTotal = (skuCode: string) => {
-    const allocations = skuAddressAllocations[skuCode] || {};
+  const getRowAllocationTotal = (rowIndex: number) => {
+    const allocations = rowAddressAllocations[rowIndex] || {};
     return Object.values(allocations).reduce((sum, qty) => sum + (qty || 0), 0);
   };
 
-  const isSKUAllocationValid = (skuCode: string) => {
-    if (!skuSplitRequired[skuCode]) return true;
-    const requiredTags = skuQuantities[skuCode] || 0;
-    const allocatedTotal = getSKUAllocationTotal(skuCode);
+  const isRowAllocationValid = (rowIndex: number) => {
+    if (!rowSplitRequired[rowIndex]) return true;
+    const requiredTags = rowTagQuantities[rowIndex] || 0;
+    const allocatedTotal = getRowAllocationTotal(rowIndex);
     return allocatedTotal === requiredTags;
   };
 
-  const filteredPOs = mockPOs.filter(po => 
-    po.id.toLowerCase().includes(poSearchQuery.toLowerCase()) ||
-    po.supplier.toLowerCase().includes(poSearchQuery.toLowerCase())
-  );
-
   const isStep2Valid = () => {
-    const hasSelectedSKUs = mockSKUs.some(sku => selectedSKUs[sku.code]);
-    return hasSelectedSKUs;
+    const hasSelectedRows = excelData.some((_, index) => selectedRows[index]);
+    return hasSelectedRows;
   };
 
   const isStep3Valid = () => {
     if (!shipToMultipleAddresses) return true;
     
-    return mockSKUs.every(sku => {
-      if (!selectedSKUs[sku.code]) return true;
-      if (!skuSplitRequired[sku.code]) return true;
-      return isSKUAllocationValid(sku.code);
+    return excelData.every((_, index) => {
+      if (!selectedRows[index]) return true;
+      if (!rowSplitRequired[index]) return true;
+      return isRowAllocationValid(index);
     });
   };
 
@@ -379,93 +401,45 @@ export function OrderWizard() {
       case 1:
         return (
           <div className="space-y-6">
-            <Tabs value={inputMethod} onValueChange={setInputMethod} className="w-full">
-              <TabsList className="grid w-full grid-cols-2">
-                <TabsTrigger value="search" className="flex items-center gap-2">
-                  <Search className="w-4 h-4" />
-                  Search PO Number
-                </TabsTrigger>
-                <TabsTrigger value="upload" className="flex items-center gap-2">
-                  <Upload className="w-4 h-4" />
-                  Upload Excel File
-                </TabsTrigger>
-              </TabsList>
-
-              <TabsContent value="search" className="space-y-4">
-                <div>
-                  <Label htmlFor="po-search">Search Purchase Order</Label>
-                  <Input
-                    id="po-search"
-                    placeholder="Enter PO number or supplier name..."
-                    value={poSearchQuery}
-                    onChange={(e) => setPOSearchQuery(e.target.value)}
-                    className="mt-2"
+            <div className="space-y-4">
+              <div className="border-2 border-dashed border-muted-foreground/25 rounded-lg p-8 text-center">
+                <Upload className="w-12 h-12 mx-auto text-muted-foreground mb-4" />
+                <h3 className="text-lg font-semibold mb-2">Upload Excel File</h3>
+                <p className="text-muted-foreground mb-4">
+                  Upload an Excel file containing product details and quantities
+                </p>
+                <div className="relative">
+                  <input
+                    type="file"
+                    accept=".xlsx,.xls,.csv"
+                    onChange={handleFileUpload}
+                    className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
                   />
-                </div>
-
-                {poSearchQuery && (
-                  <div className="space-y-2">
-                    <Label className="text-sm font-medium">Search Results</Label>
-                    <div className="border rounded-lg max-h-48 overflow-y-auto">
-                      {filteredPOs.map((po) => (
-                        <div
-                          key={po.id}
-                          className={`p-3 cursor-pointer hover:bg-accent border-b last:border-b-0 ${
-                            selectedPO === po.id ? "bg-primary/10 border-primary" : ""
-                          }`}
-                          onClick={() => setSelectedPO(po.id)}
-                        >
-                          <div className="flex justify-between items-center">
-                            <div>
-                              <span className="font-medium">{po.id}</span>
-                              <span className="text-muted-foreground ml-2">{po.supplier}</span>
-                            </div>
-                            <span className="text-sm font-medium">{po.value}</span>
-                          </div>
-                          <div className="text-sm text-muted-foreground mt-1">{po.date}</div>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                )}
-              </TabsContent>
-
-              <TabsContent value="upload" className="space-y-4">
-                <div className="border-2 border-dashed border-muted-foreground/25 rounded-lg p-8 text-center">
-                  <Upload className="w-12 h-12 mx-auto text-muted-foreground mb-4" />
-                  <h3 className="text-lg font-semibold mb-2">Upload Excel File</h3>
-                  <p className="text-muted-foreground mb-4">
-                    Upload an Excel file containing PO details and SKU information
-                  </p>
                   <Button variant="outline">
                     <Upload className="w-4 h-4 mr-2" />
                     Choose File
                   </Button>
-                  <p className="text-xs text-muted-foreground mt-2">
-                    Supported formats: .xlsx, .xls (Max size: 10MB)
-                  </p>
                 </div>
-              </TabsContent>
-            </Tabs>
+                <p className="text-xs text-muted-foreground mt-2">
+                  Supported formats: .xlsx, .xls, .csv (Max size: 10MB)
+                </p>
+              </div>
+            </div>
 
-            {selectedPO && (
+            {uploadedFile && (
               <Card>
                 <CardHeader>
-                  <CardTitle className="text-lg">Selected Purchase Order</CardTitle>
+                  <CardTitle className="text-lg">Uploaded File</CardTitle>
                 </CardHeader>
                 <CardContent>
-                  <div className="grid grid-cols-3 gap-4">
+                  <div className="grid grid-cols-2 gap-4">
                     <div>
-                      <Label className="text-sm text-muted-foreground">PO Number</Label>
-                      <p className="font-medium">{selectedPO}</p>
+                      <Label className="text-sm text-muted-foreground">File Name</Label>
+                      <p className="font-medium">{uploadedFile.name}</p>
                     </div>
                     <div>
-                      <Label className="text-sm text-muted-foreground">Supplier</Label>
-                      <p className="font-medium">{mockPOs.find(po => po.id === selectedPO)?.supplier}</p>
-                    </div>
-                    <div>
-                      <Label className="text-sm text-muted-foreground">Total Value</Label>
-                      <p className="font-medium">{mockPOs.find(po => po.id === selectedPO)?.value}</p>
+                      <Label className="text-sm text-muted-foreground">Rows Found</Label>
+                      <p className="font-medium">{excelData.length}</p>
                     </div>
                   </div>
                 </CardContent>
@@ -475,7 +449,7 @@ export function OrderWizard() {
         );
 
       case 2:
-        const allSKUsSelected = mockSKUs.every(sku => selectedSKUs[sku.code]);
+        const allRowsSelected = excelData.every((_, index) => selectedRows[index]);
 
         return (
           <div className="space-y-6">
@@ -518,44 +492,50 @@ export function OrderWizard() {
                   <TableHead className="w-12">
                     <Checkbox
                       ref={selectAllRef}
-                      checked={allSKUsSelected}
+                      checked={allRowsSelected}
                       onCheckedChange={toggleSelectAll}
                     />
                   </TableHead>
-                  <TableHead>SKU Code</TableHead>
+                  <TableHead>Variant Article Number</TableHead>
                   <TableHead>Description</TableHead>
-                  <TableHead>Ordered Quantity</TableHead>
+                  <TableHead>Size</TableHead>
+                  <TableHead>Color</TableHead>
+                  <TableHead>PO Number</TableHead>
+                  <TableHead>Quantity</TableHead>
                   <TableHead>Tags Required</TableHead>
                   <TableHead>Overhead %</TableHead>
                   <TableHead>Split Required?</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {mockSKUs.map((sku) => {
-                  const isSelected = selectedSKUs[sku.code];
-                  const tagQty = skuQuantities[sku.code] || 0;
-                  const overhead = skuOverheads[sku.code] || 2;
-                  const splitRequired = skuSplitRequired[sku.code] || false;
+                {excelData.map((row, index) => {
+                  const isSelected = selectedRows[index];
+                  const tagQty = rowTagQuantities[index] || 0;
+                  const overhead = rowOverheads[index] || 2;
+                  const splitRequired = rowSplitRequired[index] || false;
 
                   return (
-                    <TableRow key={sku.code} className={isSelected ? "bg-accent/50" : ""}>
+                    <TableRow key={index} className={isSelected ? "bg-accent/50" : ""}>
                       <TableCell>
                         <Checkbox
                           checked={isSelected}
-                          onCheckedChange={() => toggleSKU(sku.code)}
+                          onCheckedChange={() => toggleRow(index)}
                         />
                       </TableCell>
-                      <TableCell className="font-medium">{sku.code}</TableCell>
-                      <TableCell>{sku.description}</TableCell>
-                      <TableCell>{sku.ordered}</TableCell>
+                      <TableCell className="font-medium">{row["Variant Article Number"]}</TableCell>
+                      <TableCell>{row.DESC}</TableCell>
+                      <TableCell>{row.Size}</TableCell>
+                      <TableCell>{row.COLOR}</TableCell>
+                      <TableCell>{row["po number"]}</TableCell>
+                      <TableCell>{row.QTY}</TableCell>
                       <TableCell>
                         <Input
                           type="number"
                           value={tagQty}
-                          onChange={(e) => updateSKUQuantity(sku.code, parseInt(e.target.value) || 0)}
+                          onChange={(e) => updateRowTagQuantity(index, parseInt(e.target.value) || 0)}
                           className="w-24"
                           min="1"
-                          max={sku.ordered}
+                          max={parseInt(row.QTY)}
                           disabled={!isSelected}
                         />
                       </TableCell>
@@ -563,7 +543,7 @@ export function OrderWizard() {
                         <Input
                           type="number"
                           value={overhead}
-                          onChange={(e) => updateSKUOverhead(sku.code, parseFloat(e.target.value) || 0)}
+                          onChange={(e) => updateRowOverhead(index, parseFloat(e.target.value) || 0)}
                           className="w-20"
                           min="1"
                           max="5"
@@ -576,7 +556,7 @@ export function OrderWizard() {
                           <Button
                             variant={splitRequired ? "default" : "outline"}
                             size="sm"
-                            onClick={() => toggleSKUSplitRequired(sku.code)}
+                            onClick={() => toggleRowSplitRequired(index)}
                             disabled={!isSelected || !shipToMultipleAddresses}
                           >
                             {splitRequired ? "Yes" : "No"}
@@ -592,7 +572,7 @@ export function OrderWizard() {
             {!isStep2Valid() && (
               <div className="p-4 bg-destructive/10 border border-destructive/20 rounded-lg">
                 <p className="text-sm text-destructive font-medium">
-                  Please select at least one SKU to continue.
+                  Please select at least one row to continue.
                 </p>
               </div>
             )}
@@ -613,26 +593,27 @@ export function OrderWizard() {
               <p className="text-muted-foreground">Allocate quantities to shipping addresses</p>
             </div>
 
-            {mockSKUs.filter(sku => selectedSKUs[sku.code]).map((sku) => {
-              const tagQty = skuQuantities[sku.code] || 0;
-              const splitRequired = skuSplitRequired[sku.code];
-              const allocations = skuAddressAllocations[sku.code] || {};
-              const allocatedTotal = getSKUAllocationTotal(sku.code);
-              const isValid = isSKUAllocationValid(sku.code);
+            {excelData.filter((_, index) => selectedRows[index]).map((row, originalIndex) => {
+              const index = excelData.findIndex(r => r === row);
+              const tagQty = rowTagQuantities[index] || 0;
+              const splitRequired = rowSplitRequired[index];
+              const allocations = rowAddressAllocations[index] || {};
+              const allocatedTotal = getRowAllocationTotal(index);
+              const isValid = isRowAllocationValid(index);
 
               if (!splitRequired) {
                 return (
-                  <Card key={sku.code}>
+                  <Card key={index}>
                     <CardHeader>
-                      <CardTitle className="text-base">{sku.code} - {sku.description}</CardTitle>
+                      <CardTitle className="text-base">{row["Variant Article Number"]} - {row.DESC}</CardTitle>
                       <p className="text-sm text-muted-foreground">Quantity: {tagQty} tags</p>
                     </CardHeader>
                     <CardContent>
                       <div className="flex items-center gap-4">
                         <Label>Address:</Label>
                         <Select 
-                          value={(skuSingleAddresses[sku.code] || 1).toString()} 
-                          onValueChange={(value) => updateSKUSingleAddress(sku.code, parseInt(value))}
+                          value={(rowSingleAddresses[index] || 1).toString()} 
+                          onValueChange={(value) => updateRowSingleAddress(index, parseInt(value))}
                         >
                           <SelectTrigger className="w-80">
                             <SelectValue />
@@ -653,17 +634,21 @@ export function OrderWizard() {
 
               return (
                 <AllocationForm
-                  key={sku.code}
-                  sku={sku}
+                  key={index}
+                  sku={{
+                    code: row["Variant Article Number"],
+                    description: row.DESC,
+                    ordered: parseInt(row.QTY)
+                  }}
                   tagQty={tagQty}
                   allocations={allocations}
                   allocatedTotal={allocatedTotal}
                   isValid={isValid}
                   onAllocate={(addressId, quantity) => {
-                    updateSKUAddressAllocation(sku.code, addressId, (allocations[addressId] || 0) + quantity);
+                    updateRowAddressAllocation(index, addressId, (allocations[addressId] || 0) + quantity);
                   }}
                   onRemoveAllocation={(addressId) => {
-                    updateSKUAddressAllocation(sku.code, addressId, 0);
+                    updateRowAddressAllocation(index, addressId, 0);
                   }}
                 />
               );
@@ -672,12 +657,17 @@ export function OrderWizard() {
         );
 
       case 4:
-        const selectedSKUsList = mockSKUs.filter(sku => selectedSKUs[sku.code]);
-        const totalTags = selectedSKUsList.reduce((sum, sku) => sum + (skuQuantities[sku.code] || 0), 0);
-        const totalCost = selectedSKUsList.reduce((sum, sku) => {
-          const qty = skuQuantities[sku.code] || 0;
-          const overhead = skuOverheads[sku.code] || 2;
-          return sum + (qty * sku.unitPrice * (1 + overhead / 100));
+        const selectedRowsList = excelData.filter((_, index) => selectedRows[index]);
+        const totalTags = selectedRowsList.reduce((sum, row, i) => {
+          const originalIndex = excelData.findIndex(r => r === row);
+          return sum + (rowTagQuantities[originalIndex] || 0);
+        }, 0);
+        const totalCost = selectedRowsList.reduce((sum, row, i) => {
+          const originalIndex = excelData.findIndex(r => r === row);
+          const qty = rowTagQuantities[originalIndex] || 0;
+          const overhead = rowOverheads[originalIndex] || 2;
+          const unitPrice = parseFloat(row.MRP) || 0;
+          return sum + (qty * unitPrice * (1 + overhead / 100));
         }, 0);
 
         return (
@@ -694,16 +684,12 @@ export function OrderWizard() {
                 </CardHeader>
                 <CardContent className="space-y-3">
                   <div className="flex justify-between">
-                    <span className="text-muted-foreground">PO Number:</span>
-                    <span className="font-medium">{selectedPO}</span>
+                    <span className="text-muted-foreground">File Name:</span>
+                    <span className="font-medium">{uploadedFile?.name}</span>
                   </div>
                   <div className="flex justify-between">
-                    <span className="text-muted-foreground">Supplier:</span>
-                    <span className="font-medium">{mockPOs.find(po => po.id === selectedPO)?.supplier}</span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span className="text-muted-foreground">Input Method:</span>
-                    <span className="font-medium capitalize">{inputMethod}</span>
+                    <span className="text-muted-foreground">Total Rows:</span>
+                    <span className="font-medium">{excelData.length}</span>
                   </div>
                   <div className="flex justify-between">
                     <span className="text-muted-foreground">Shipping Mode:</span>
@@ -718,8 +704,8 @@ export function OrderWizard() {
                 </CardHeader>
                 <CardContent className="space-y-3">
                   <div className="flex justify-between">
-                    <span className="text-muted-foreground">Selected SKUs:</span>
-                    <span className="font-medium">{selectedSKUsList.length}</span>
+                    <span className="text-muted-foreground">Selected Rows:</span>
+                    <span className="font-medium">{selectedRowsList.length}</span>
                   </div>
                   <div className="flex justify-between">
                     <span className="text-muted-foreground">Total Tags:</span>
@@ -735,26 +721,28 @@ export function OrderWizard() {
 
             <Card>
               <CardHeader>
-                <CardTitle className="text-base">SKU Details</CardTitle>
+                <CardTitle className="text-base">Product Details</CardTitle>
               </CardHeader>
               <CardContent>
                 <div className="space-y-4">
-                  {selectedSKUsList.map((sku) => {
-                    const tagQty = skuQuantities[sku.code] || 0;
-                    const overhead = skuOverheads[sku.code] || 2;
-                    const splitRequired = skuSplitRequired[sku.code];
+                  {selectedRowsList.map((row, i) => {
+                    const originalIndex = excelData.findIndex(r => r === row);
+                    const tagQty = rowTagQuantities[originalIndex] || 0;
+                    const overhead = rowOverheads[originalIndex] || 2;
+                    const splitRequired = rowSplitRequired[originalIndex];
+                    const unitPrice = parseFloat(row.MRP) || 0;
 
                     return (
-                      <div key={sku.code} className="p-4 bg-accent/20 rounded-lg space-y-3">
+                      <div key={originalIndex} className="p-4 bg-accent/20 rounded-lg space-y-3">
                         <div className="flex justify-between items-start">
                           <div>
-                            <span className="font-medium">{sku.code}</span>
-                            <span className="text-muted-foreground ml-2">{sku.description}</span>
+                            <span className="font-medium">{row["Variant Article Number"]}</span>
+                            <span className="text-muted-foreground ml-2">{row.DESC}</span>
                           </div>
                           <div className="text-right">
                             <div>Qty: {tagQty} | Overhead: {overhead}%</div>
                             <div className="text-sm text-muted-foreground">
-                              Unit: ${sku.unitPrice} | Total: ${((tagQty * sku.unitPrice) * (1 + overhead/100)).toFixed(2)}
+                              Unit: ₹{unitPrice} | Total: ₹{((tagQty * unitPrice) * (1 + overhead/100)).toFixed(2)}
                             </div>
                           </div>
                         </div>
@@ -766,7 +754,7 @@ export function OrderWizard() {
                             splitRequired ? (
                               <div className="grid grid-cols-1 md:grid-cols-3 gap-2">
                                 {mockAddresses.map((addr) => {
-                                  const qty = skuAddressAllocations[sku.code]?.[addr.id] || 0;
+                                  const qty = rowAddressAllocations[originalIndex]?.[addr.id] || 0;
                                   if (qty === 0) return null;
                                   return (
                                     <div key={addr.id} className="text-sm bg-background p-2 rounded">
@@ -778,7 +766,7 @@ export function OrderWizard() {
                               </div>
                             ) : (
                               <div className="text-sm">
-                                {mockAddresses.find(addr => addr.id === (skuSingleAddresses[sku.code] || 1))?.name} - {tagQty} tags
+                                {mockAddresses.find(addr => addr.id === (rowSingleAddresses[originalIndex] || 1))?.name} - {tagQty} tags
                               </div>
                             )
                           ) : (
@@ -852,7 +840,7 @@ export function OrderWizard() {
         <Button
           onClick={handleNext}
           disabled={
-            (currentStep === 1 && !selectedPO) ||
+            (currentStep === 1 && !uploadedFile) ||
             (currentStep === 2 && !isStep2Valid()) ||
             (currentStep === 3 && !isStep3Valid()) ||
             currentStep === steps.length
