@@ -222,10 +222,9 @@ interface Step {
 }
 
 const steps: Step[] = [
-  { id: 1, title: "Upload Excel", description: "Upload Excel file" },
-  { id: 2, title: "Tag Details", description: "Configure SKU tags" },
-  { id: 3, title: "Address Allocation", description: "Allocate to addresses" },
-  { id: 4, title: "Review & Confirm", description: "Final review" },
+  { id: 1, title: "Upload Data", description: "Upload Excel file" },
+  { id: 2, title: "Data Validation", description: "Configure SKU tags" },
+  { id: 3, title: "Order Summary", description: "Review & confirm order" },
 ];
 
 interface ExcelRow {
@@ -314,7 +313,10 @@ export function OrderWizard() {
   };
 
   const handleNext = () => {
-    if (currentStep < steps.length) {
+    if (currentStep === 2) {
+      // Skip step 3 (address allocation) and go directly to step 4 (order summary)
+      setCurrentStep(3);
+    } else if (currentStep < steps.length) {
       setCurrentStep(currentStep + 1);
     }
   };
@@ -393,17 +395,7 @@ export function OrderWizard() {
 
   const isStep2Valid = () => {
     const hasSelectedRows = excelData.some((_, index) => selectedRows[index]);
-    return excelData;
-  };
-
-  const isStep3Valid = () => {
-    if (!shipToMultipleAddresses) return true;
-
-    return excelData.every((_, index) => {
-      if (!selectedRows[index]) return true;
-      if (!rowSplitRequired[index]) return true;
-      return isRowAllocationValid(index);
-    });
+    return excelData.length > 0;
   };
 
   function excelSerialToMonthYear(serial: number) {
@@ -477,59 +469,302 @@ export function OrderWizard() {
           <div className="space-y-6">
             <div className="flex justify-between items-center">
               <div>
-                <h3 className="text-lg font-semibold">Configure Tag Details</h3>
+                <h3 className="text-lg font-semibold">Data Validation</h3>
                 <p className="text-muted-foreground">Select SKUs and configure tag quantities</p>
               </div>
-              {/* <div className="flex items-center space-x-2">
-                <Checkbox
-                  id="ship-multiple"
-                  checked={shipToMultipleAddresses}
-                  onCheckedChange={(checked) => setShipToMultipleAddresses(!!checked)}
-                />
-                <Label htmlFor="ship-multiple">Ship to Multiple Addresses</Label>
-              </div> */}
             </div>
 
-            {!shipToMultipleAddresses && (
-              <div className="mb-4">
-                <Label htmlFor="single-address">Shipping Address</Label>
-                <Select value={singleAddress.toString()} onValueChange={(value) => setSingleAddress(parseInt(value))}>
-                  <SelectTrigger className="w-80">
-                    <SelectValue placeholder="Select shipping address" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {mockAddresses.map((addr) => (
-                      <SelectItem key={addr.id} value={addr.id.toString()}>
-                        {addr.name} - {addr.address}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+            <div className="mb-4">
+              <Label htmlFor="single-address">Default Shipping Address</Label>
+              <Select value={singleAddress.toString()} onValueChange={(value) => setSingleAddress(parseInt(value))}>
+                <SelectTrigger className="w-80">
+                  <SelectValue placeholder="Select shipping address" />
+                </SelectTrigger>
+                <SelectContent>
+                  {mockAddresses.map((addr) => (
+                    <SelectItem key={addr.id} value={addr.id.toString()}>
+                      {addr.name} - {addr.address}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div className="border rounded-lg overflow-hidden">
+              <Table>
+                <TableHeader>
+                  <TableRow className="bg-primary hover:bg-primary">
+                    <TableHead className="text-primary-foreground font-semibold">SKU Code</TableHead>
+                    <TableHead className="text-primary-foreground font-semibold">Description</TableHead>
+                    <TableHead className="text-primary-foreground font-semibold text-center">Ordered Quantity</TableHead>
+                    <TableHead className="text-primary-foreground font-semibold text-center">Tags Required</TableHead>
+                    <TableHead className="text-primary-foreground font-semibold text-center">Overhead %</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {excelData.map((row, index) => {
+                    const tagQty = rowTagQuantities[index] || parseInt(row.QTY) || 0;
+                    const overhead = rowOverheads[index] || 2;
+
+                    return (
+                      <TableRow key={index} className="hover:bg-muted/50">
+                        <TableCell className="font-medium">{row["Variant Article Number"]}</TableCell>
+                        <TableCell>{row.DESC}</TableCell>
+                        <TableCell className="text-center">{row.QTY}</TableCell>
+                        <TableCell className="text-center">
+                          <Input
+                            type="number"
+                            value={tagQty}
+                            onChange={(e) =>
+                              updateRowTagQuantity(index, parseInt(e.target.value) || 0)
+                            }
+                            className="w-20 text-center"
+                            min="1"
+                          />
+                        </TableCell>
+                        <TableCell className="text-center">
+                          <Select
+                            value={overhead.toString()}
+                            onValueChange={(value) => updateRowOverhead(index, parseInt(value))}
+                          >
+                            <SelectTrigger className="w-20">
+                              <SelectValue />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="0">0%</SelectItem>
+                              <SelectItem value="1">1%</SelectItem>
+                              <SelectItem value="2">2%</SelectItem>
+                              <SelectItem value="3">3%</SelectItem>
+                              <SelectItem value="4">4%</SelectItem>
+                              <SelectItem value="5">5%</SelectItem>
+                            </SelectContent>
+                          </Select>
+                        </TableCell>
+                      </TableRow>
+                    );
+                  })}
+                </TableBody>
+              </Table>
+            </div>
+
+            {!isStep2Valid() && (
+              <div className="p-4 bg-destructive/10 border border-destructive/20 rounded-lg">
+                <p className="text-sm text-destructive font-medium">
+                  Please upload an Excel file to continue.
+                </p>
               </div>
             )}
+          </div>
+        );
 
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  {/* <TableHead className="w-12">
-        <Checkbox
-          ref={selectAllRef}
-          checked={allRowsSelected}
-          onCheckedChange={toggleSelectAll}
-        />
-      </TableHead> */}
+      case 3:
+        const selectedRowsList = excelData;
+        const totalTags = selectedRowsList.reduce((sum, row, i) => {
+          return sum + (rowTagQuantities[i] || parseInt(row.QTY) || 0);
+        }, 0);
+        const totalCost = selectedRowsList.reduce((sum, row, i) => {
+          const qty = rowTagQuantities[i] || parseInt(row.QTY) || 0;
+          const overhead = rowOverheads[i] || 2;
+          const unitPrice = parseFloat(row.MRP) || 0;
+          return sum + (qty * unitPrice * (1 + overhead / 100));
+        }, 0);
 
-                  {/* Auto-generate headers from keys except excluded ones */}
-                  {excelData.length > 0 &&
-                    Object.keys(excelData[0]).map((col) =>
-                      !excludedColumns.includes(col.toLowerCase()) && (
-                        <TableHead key={col}>{col}</TableHead>
-                      )
-                    )}
+        return (
+          <div className="space-y-6">
+            <div>
+              <h3 className="text-lg font-semibold mb-2">Order Summary</h3>
+              <p className="text-muted-foreground">Review your tag order before submitting</p>
+            </div>
 
-                  <TableHead>Tags Required</TableHead>
-                  <TableHead>Overage %</TableHead>
-                  {/* <TableHead>Split Required?</TableHead> */}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              <Card>
+                <CardHeader>
+                  <CardTitle className="text-base">Purchase Order Details</CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-3">
+                  <div className="flex justify-between">
+                    <span className="text-muted-foreground">PO Number:</span>
+                    <span className="font-medium">{excelData[0]?.["po number"] || "N/A"}</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-muted-foreground">Supplier:</span>
+                    <span className="font-medium">Fashion Co.</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-muted-foreground">Input Method:</span>
+                    <span className="font-medium">Excel Upload</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-muted-foreground">Shipping Mode:</span>
+                    <span className="font-medium">Single Address</span>
+                  </div>
+                </CardContent>
+              </Card>
+
+              <Card>
+                <CardHeader>
+                  <CardTitle className="text-base">Order Totals</CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-3">
+                  <div className="flex justify-between">
+                    <span className="text-muted-foreground">Selected SKUs:</span>
+                    <span className="font-medium">{selectedRowsList.length}</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-muted-foreground">Total Tags:</span>
+                    <span className="font-medium">{totalTags}</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-muted-foreground">Total Cost:</span>
+                    <span className="font-medium text-lg">₹{totalCost.toFixed(2)}</span>
+                  </div>
+                </CardContent>
+              </Card>
+            </div>
+
+            {/* Shipping Address */}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              <Card>
+                <CardHeader>
+                  <CardTitle className="text-base">Shipping Address</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <div className="space-y-2">
+                    <div className="font-medium">
+                      {mockAddresses.find(addr => addr.id === singleAddress)?.name}
+                    </div>
+                    <div className="text-sm text-muted-foreground">
+                      {mockAddresses.find(addr => addr.id === singleAddress)?.address}
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+
+              <Card>
+                <CardHeader>
+                  <CardTitle className="text-base">Billing Address</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <div className="space-y-2">
+                    <div className="font-medium">Warehouse B</div>
+                    <div className="text-sm text-muted-foreground">
+                      wing B 55, 2nd Floor, Bhiwandi, Thane
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+            </div>
+
+            {/* Product Details Table */}
+            <Card>
+              <CardHeader>
+                <CardTitle className="text-base">Product Details</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="border rounded-lg overflow-hidden">
+                  <Table>
+                    <TableHeader>
+                      <TableRow className="bg-primary hover:bg-primary">
+                        <TableHead className="text-primary-foreground font-semibold">Sr. No</TableHead>
+                        <TableHead className="text-primary-foreground font-semibold">SKU Code</TableHead>
+                        <TableHead className="text-primary-foreground font-semibold">Description</TableHead>
+                        <TableHead className="text-primary-foreground font-semibold text-center">Ordered Quantity</TableHead>
+                        <TableHead className="text-primary-foreground font-semibold text-center">Tags Required</TableHead>
+                        <TableHead className="text-primary-foreground font-semibold text-center">Overhead %</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {selectedRowsList.map((row, index) => {
+                        const tagQty = rowTagQuantities[index] || parseInt(row.QTY) || 0;
+                        const overhead = rowOverheads[index] || 2;
+
+                        return (
+                          <TableRow key={index} className="hover:bg-muted/50">
+                            <TableCell className="text-center">{index + 1}</TableCell>
+                            <TableCell className="font-medium">{row["Variant Article Number"]}</TableCell>
+                            <TableCell>{row.DESC}</TableCell>
+                            <TableCell className="text-center">{row.QTY}</TableCell>
+                            <TableCell className="text-center">{tagQty}</TableCell>
+                            <TableCell className="text-center">{overhead}%</TableCell>
+                          </TableRow>
+                        );
+                      })}
+                    </TableBody>
+                  </Table>
+                </div>
+              </CardContent>
+            </Card>
+          </div>
+        );
+
+      default:
+        return null;
+    }
+  };
+
+  return (
+    <Card className="shadow-card">
+      <CardHeader className="border-b border-border">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center justify-between w-full">
+            {steps.map((step, index) => (
+              <div key={step.id} className="flex items-center">
+                <div
+                  className={`w-8 h-8 rounded-full flex items-center justify-center text-sm font-medium ${
+                    step.id === currentStep
+                      ? "bg-primary text-primary-foreground"
+                      : step.id < currentStep
+                      ? "bg-green-500 text-white"
+                      : "bg-muted text-muted-foreground"
+                  }`}
+                >
+                  {step.id < currentStep ? "✓" : step.id}
+                </div>
+                <div className="ml-2 mr-4">
+                  <p className={`text-sm font-medium ${step.id === currentStep ? "text-primary" : "text-muted-foreground"}`}>
+                    {step.title}
+                  </p>
+                  <p className="text-xs text-muted-foreground">{step.description}</p>
+                </div>
+                {index < steps.length - 1 && (
+                  <div className={`h-px w-16 mx-2 ${step.id < currentStep ? "bg-green-500" : "bg-muted"}`} />
+                )}
+              </div>
+            ))}
+          </div>
+        </div>
+      </CardHeader>
+
+      <CardContent className="p-6">
+        {renderStepContent()}
+      </CardContent>
+
+      <div className="flex justify-between p-6 border-t border-border">
+        <Button
+          onClick={handlePrevious}
+          disabled={currentStep === 1}
+          variant="outline"
+        >
+          <ChevronLeft className="w-4 h-4 mr-2" />
+          Previous
+        </Button>
+
+        <Button
+          onClick={handleNext}
+          disabled={
+            (currentStep === 1 && !uploadedFile) ||
+            (currentStep === 2 && !isStep2Valid()) ||
+            currentStep === steps.length
+          }
+          className={currentStep === steps.length ? "bg-gradient-primary" : ""}
+        >
+          {currentStep === steps.length ? "Submit Order" : "Next"}
+          {currentStep < steps.length && <ChevronRight className="w-4 h-4 ml-2" />}
+        </Button>
+      </div>
+    </Card>
+  );
+}
                 </TableRow>
               </TableHeader>
 
