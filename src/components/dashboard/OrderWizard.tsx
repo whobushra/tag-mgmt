@@ -8,6 +8,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { ChevronRight, ChevronLeft, Upload, Plus, Minus, ChevronDown, ChevronUp } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Checkbox } from "@/components/ui/checkbox";
+import * as XLSX from "xlsx";
 
 interface AllocationFormProps {
   sku: {
@@ -37,7 +38,7 @@ const AllocationForm: React.FC<AllocationFormProps> = ({
   const [quantity, setQuantity] = useState('');
 
   // Filter addresses based on search query
-  const filteredAddresses = mockAddresses.filter(addr => 
+  const filteredAddresses = mockAddresses.filter(addr =>
     addr.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
     addr.address.toLowerCase().includes(searchQuery.toLowerCase())
   );
@@ -48,7 +49,7 @@ const AllocationForm: React.FC<AllocationFormProps> = ({
     const addressId = parseInt(selectedAddress);
     const qty = parseInt(quantity);
     if (isNaN(addressId) || isNaN(qty) || qty <= 0) return;
-    
+
     onAllocate(addressId, qty);
     setQuantity('');
     setSearchQuery('');
@@ -83,7 +84,7 @@ const AllocationForm: React.FC<AllocationFormProps> = ({
           </div>
         </div>
       </CardHeader>
-      
+
       <CardContent className="pt-6">
         <div className="space-y-4">
           <div className="grid md:grid-cols-4 gap-4 items-end">
@@ -100,13 +101,13 @@ const AllocationForm: React.FC<AllocationFormProps> = ({
                 />
               </div>
             </div> */}
-            
+
             <div className="space-y-2">
               <Label htmlFor={`select-address-${sku.code}`}>Select Address</Label>
-              <Select 
-                value={selectedAddress} 
+              <Select
+                value={selectedAddress}
                 onValueChange={setSelectedAddress}
-                // disabled={searchQuery}
+              // disabled={searchQuery}
               >
                 <SelectTrigger id={`select-address-${sku.code}`}>
                   <SelectValue placeholder={searchQuery ? "Select an address" : "Search for an address"} />
@@ -129,7 +130,7 @@ const AllocationForm: React.FC<AllocationFormProps> = ({
                 </SelectContent>
               </Select>
             </div>
-            
+
             <div className="space-y-2">
               <Label htmlFor={`quantity-${sku.code}`}>Quantity</Label>
               <Input
@@ -143,8 +144,8 @@ const AllocationForm: React.FC<AllocationFormProps> = ({
                 disabled={!selectedAddress}
               />
             </div>
-            
-            <Button 
+
+            <Button
               onClick={handleAddAllocation}
               disabled={!selectedAddress || !quantity || (parseInt(quantity) || 0) <= 0}
               className="w-full md:w-auto"
@@ -152,7 +153,7 @@ const AllocationForm: React.FC<AllocationFormProps> = ({
               Add
             </Button>
           </div>
-          
+
           {/* Allocations Table */}
           {Object.keys(allocations).length > 0 && (
             <div className="border rounded-lg overflow-hidden">
@@ -169,7 +170,7 @@ const AllocationForm: React.FC<AllocationFormProps> = ({
                   {Object.entries(allocations).map(([addrId, qty]) => {
                     const address = mockAddresses.find(a => a.id === parseInt(addrId));
                     if (!address) return null;
-                    
+
                     return (
                       <TableRow key={addrId}>
                         <TableCell className="font-medium">{address.name}</TableCell>
@@ -178,8 +179,8 @@ const AllocationForm: React.FC<AllocationFormProps> = ({
                         </TableCell>
                         <TableCell className="text-right">{qty}</TableCell>
                         <TableCell>
-                          <Button 
-                            variant="ghost" 
+                          <Button
+                            variant="ghost"
                             size="sm"
                             onClick={() => onRemoveAllocation(parseInt(addrId))}
                           >
@@ -193,7 +194,7 @@ const AllocationForm: React.FC<AllocationFormProps> = ({
               </Table>
             </div>
           )}
-          
+
           {/* Total Allocated */}
           <div className="flex justify-between items-center p-3 bg-muted/20 rounded-lg">
             <span className="font-medium">Total Allocated</span>
@@ -227,7 +228,6 @@ const steps: Step[] = [
   { id: 4, title: "Review & Confirm", description: "Final review" },
 ];
 
-// Excel data interface
 interface ExcelRow {
   MRP: string;
   Size: string;
@@ -241,6 +241,7 @@ interface ExcelRow {
   EAN: string;
   QTY: string;
 }
+
 
 const mockAddresses = [
   { id: 1, name: "Warehouse A", address: "123 Main St, New York, NY 10001" },
@@ -260,14 +261,14 @@ export function OrderWizard() {
   const [singleAddress, setSingleAddress] = useState(1);
   const [rowSingleAddresses, setRowSingleAddresses] = useState<Record<number, number>>({});
   const [rowAddressAllocations, setRowAddressAllocations] = useState<Record<number, Record<number, number>>>({});
-  
+
   const selectAllRef = useRef<HTMLButtonElement>(null);
 
   // Handle indeterminate state for select all checkbox
   useEffect(() => {
     const allSelected = excelData.every((_, index) => selectedRows[index]);
     const someSelected = excelData.some((_, index) => selectedRows[index]);
-    
+
     if (selectAllRef.current) {
       const checkbox = selectAllRef.current.querySelector('input[type="checkbox"]') as HTMLInputElement;
       if (checkbox) {
@@ -280,26 +281,35 @@ export function OrderWizard() {
     const file = event.target.files?.[0];
     if (file) {
       setUploadedFile(file);
-      // In a real implementation, you would parse the Excel file here
-      // For now, we'll simulate with mock data based on the CSV structure
-      const mockExcelData: ExcelRow[] = [
-        { MRP: "2299", Size: "S", "Met Size": "38 cm", COLOR: "DK. BROWN", "Style Code": "AAW25ZC CWAT6507", "Variant Article Number": "443084681001", DESC: "AZORTE SHIRTS", "YR MONTH": "23-08-2025", "po number": "abc-1", EAN: "8909255816959", QTY: "80" },
-        { MRP: "2299", Size: "S", "Met Size": "38 cm", COLOR: "DK. BROWN", "Style Code": "AAW25ZC CWAT6507", "Variant Article Number": "443084681002", DESC: "AZORTE SHIRTS", "YR MONTH": "23-08-2025", "po number": "abc-2", EAN: "8909255816942", QTY: "90" },
-        { MRP: "2299", Size: "M", "Met Size": "40 cm", COLOR: "DK. BROWN", "Style Code": "AAW25ZC CWAT6507", "Variant Article Number": "443084681003", DESC: "AZORTE SHIRTS", "YR MONTH": "23-08-2025", "po number": "abc-3", EAN: "8909255816935", QTY: "100" },
-        { MRP: "2299", Size: "L", "Met Size": "42 cm", COLOR: "DK. BROWN", "Style Code": "AAW25ZC CWAT6507", "Variant Article Number": "443084681004", DESC: "AZORTE SHIRTS", "YR MONTH": "24-08-2025", "po number": "abc-4", EAN: "8909255816966", QTY: "120" },
-        { MRP: "2299", Size: "XL", "Met Size": "44 cm", COLOR: "DK. BROWN", "Style Code": "AAW25ZC CWAT6507", "Variant Article Number": "443084681005", DESC: "AZORTE SHIRTS", "YR MONTH": "25-08-2025", "po number": "abc-5", EAN: "8909255816973", QTY: "150" },
-      ];
-      setExcelData(mockExcelData);
-      
-      // Initialize default values for each row
-      const defaultSelected: Record<number, boolean> = {};
-      const defaultOverheads: Record<number, number> = {};
-      mockExcelData.forEach((_, index) => {
-        defaultSelected[index] = false;
-        defaultOverheads[index] = 2; // Default 2% overhead
-      });
-      setSelectedRows(defaultSelected);
-      setRowOverheads(defaultOverheads);
+
+      const reader = new FileReader();
+      reader.onload = (e) => {
+        const data = e.target?.result;
+        if (!data) return;
+
+        // Read Excel workbook
+        const workbook = XLSX.read(data, { type: "binary" });
+        const sheetName = workbook.SheetNames[0]; // First sheet
+        const sheet = workbook.Sheets[sheetName];
+
+        // Parse into JSON
+        const jsonData: ExcelRow[] = XLSX.utils.sheet_to_json(sheet, { defval: "" });
+        console.log("Parsed Excel Data:", jsonData);
+
+        setExcelData(jsonData);
+
+        // Initialize default values for each row
+        const defaultSelected: Record<number, boolean> = {};
+        const defaultOverheads: Record<number, number> = {};
+        jsonData.forEach((_, index) => {
+          defaultSelected[index] = false;
+          defaultOverheads[index] = 2; // Default 2% overhead
+        });
+        setSelectedRows(defaultSelected);
+        setRowOverheads(defaultOverheads);
+      };
+
+      reader.readAsBinaryString(file);
     }
   };
 
@@ -383,18 +393,30 @@ export function OrderWizard() {
 
   const isStep2Valid = () => {
     const hasSelectedRows = excelData.some((_, index) => selectedRows[index]);
-    return hasSelectedRows;
+    return excelData;
   };
 
   const isStep3Valid = () => {
     if (!shipToMultipleAddresses) return true;
-    
+
     return excelData.every((_, index) => {
       if (!selectedRows[index]) return true;
       if (!rowSplitRequired[index]) return true;
       return isRowAllocationValid(index);
     });
   };
+
+  function excelSerialToMonthYear(serial: number) {
+    if (!serial || isNaN(serial)) return "";
+    const utcDays = Math.floor(serial - 25569);
+    const utcValue = utcDays * 86400;
+    const dateInfo = new Date(utcValue * 1000);
+    return dateInfo.toLocaleString("en-US", { month: "short", year: "numeric" });
+  }
+
+  // const excludedColumns = ["MRP", "Size", "Met Size", "Color", "Description", "Quantity", "__rowNum__"];
+  const excludedColumns = ["mrp", "size", "met size", "color", "desc", "qty", "__rowNum__"];
+
 
   const renderStepContent = () => {
     switch (currentStep) {
@@ -458,14 +480,14 @@ export function OrderWizard() {
                 <h3 className="text-lg font-semibold">Configure Tag Details</h3>
                 <p className="text-muted-foreground">Select SKUs and configure tag quantities</p>
               </div>
-              <div className="flex items-center space-x-2">
+              {/* <div className="flex items-center space-x-2">
                 <Checkbox
                   id="ship-multiple"
                   checked={shipToMultipleAddresses}
                   onCheckedChange={(checked) => setShipToMultipleAddresses(!!checked)}
                 />
                 <Label htmlFor="ship-multiple">Ship to Multiple Addresses</Label>
-              </div>
+              </div> */}
             </div>
 
             {!shipToMultipleAddresses && (
@@ -489,85 +511,106 @@ export function OrderWizard() {
             <Table>
               <TableHeader>
                 <TableRow>
-                  <TableHead className="w-12">
-                    <Checkbox
-                      ref={selectAllRef}
-                      checked={allRowsSelected}
-                      onCheckedChange={toggleSelectAll}
-                    />
-                  </TableHead>
-                  <TableHead>Variant Article Number</TableHead>
-                  <TableHead>Description</TableHead>
-                  <TableHead>Size</TableHead>
-                  <TableHead>Color</TableHead>
-                  <TableHead>PO Number</TableHead>
-                  <TableHead>Quantity</TableHead>
+                  {/* <TableHead className="w-12">
+        <Checkbox
+          ref={selectAllRef}
+          checked={allRowsSelected}
+          onCheckedChange={toggleSelectAll}
+        />
+      </TableHead> */}
+
+                  {/* Auto-generate headers from keys except excluded ones */}
+                  {excelData.length > 0 &&
+                    Object.keys(excelData[0]).map((col) =>
+                      !excludedColumns.includes(col.toLowerCase()) && (
+                        <TableHead key={col}>{col}</TableHead>
+                      )
+                    )}
+
                   <TableHead>Tags Required</TableHead>
-                  <TableHead>Overhead %</TableHead>
-                  <TableHead>Split Required?</TableHead>
+                  <TableHead>Overage %</TableHead>
+                  {/* <TableHead>Split Required?</TableHead> */}
                 </TableRow>
               </TableHeader>
+
               <TableBody>
                 {excelData.map((row, index) => {
                   const isSelected = selectedRows[index];
-                  const tagQty = rowTagQuantities[index] || 0;
+                  const tagQty = rowTagQuantities[index] || row.QTY || 0; // default to excel qty
                   const overhead = rowOverheads[index] || 2;
                   const splitRequired = rowSplitRequired[index] || false;
 
                   return (
                     <TableRow key={index} className={isSelected ? "bg-accent/50" : ""}>
-                      <TableCell>
-                        <Checkbox
-                          checked={isSelected}
-                          onCheckedChange={() => toggleRow(index)}
-                        />
-                      </TableCell>
-                      <TableCell className="font-medium">{row["Variant Article Number"]}</TableCell>
-                      <TableCell>{row.DESC}</TableCell>
-                      <TableCell>{row.Size}</TableCell>
-                      <TableCell>{row.COLOR}</TableCell>
-                      <TableCell>{row["po number"]}</TableCell>
-                      <TableCell>{row.QTY}</TableCell>
+                      {/* <TableCell>
+            <Checkbox
+              checked={isSelected}
+              onCheckedChange={() => toggleRow(index)}
+            />
+          </TableCell> */}
+
+                      {/* Render only non-excluded columns */}
+                      {Object.keys(row).map((col) => {
+                        if (excludedColumns.includes(col.toLowerCase())) return null;
+
+                        let value = row[col];
+
+                        // Special formatting for YR MONTH
+                        if (col === "YR MONTH" && typeof value === "number") {
+                          value = excelSerialToMonthYear(value);
+                        }
+
+                        return <TableCell key={col}>{value}</TableCell>;
+                      })}
+
+                      {/* Custom: Tags Required (linked to QTY) */}
                       <TableCell>
                         <Input
                           type="number"
                           value={tagQty}
-                          onChange={(e) => updateRowTagQuantity(index, parseInt(e.target.value) || 0)}
+                          onChange={(e) =>
+                            updateRowTagQuantity(index, parseInt(e.target.value) || 0)
+                          }
                           className="w-24"
                           min="1"
-                          max={parseInt(row.QTY)}
-                          disabled={!isSelected}
+                          // max={parseInt(row.QTY)}
+                        // disabled={!isSelected}
                         />
                       </TableCell>
+
                       <TableCell>
                         <Input
                           type="number"
                           value={overhead}
-                          onChange={(e) => updateRowOverhead(index, parseFloat(e.target.value) || 0)}
+                          onChange={(e) =>
+                            updateRowOverhead(index, parseFloat(e.target.value) || 0)
+                          }
                           className="w-20"
-                          min="1"
+                          min="0"
                           max="5"
-                          step="0.1"
-                          disabled={!isSelected}
+                          step="1"
+                        // disabled={!isSelected}
                         />
                       </TableCell>
-                      <TableCell>
-                        <div className="flex items-center">
-                          <Button
-                            variant={splitRequired ? "default" : "outline"}
-                            size="sm"
-                            onClick={() => toggleRowSplitRequired(index)}
-                            disabled={!isSelected || !shipToMultipleAddresses}
-                          >
-                            {splitRequired ? "Yes" : "No"}
-                          </Button>
-                        </div>
-                      </TableCell>
+
+                      {/* <TableCell>
+            <div className="flex items-center">
+              <Button
+                variant={splitRequired ? "default" : "outline"}
+                size="sm"
+                onClick={() => toggleRowSplitRequired(index)}
+                disabled={!isSelected || !shipToMultipleAddresses}
+              >
+                {splitRequired ? "Yes" : "No"}
+              </Button>
+            </div>
+          </TableCell> */}
                     </TableRow>
                   );
                 })}
               </TableBody>
             </Table>
+
 
             {!isStep2Valid() && (
               <div className="p-4 bg-destructive/10 border border-destructive/20 rounded-lg">
@@ -611,8 +654,8 @@ export function OrderWizard() {
                     <CardContent>
                       <div className="flex items-center gap-4">
                         <Label>Address:</Label>
-                        <Select 
-                          value={(rowSingleAddresses[index] || 1).toString()} 
+                        <Select
+                          value={(rowSingleAddresses[index] || 1).toString()}
                           onValueChange={(value) => updateRowSingleAddress(index, parseInt(value))}
                         >
                           <SelectTrigger className="w-80">
@@ -742,7 +785,7 @@ export function OrderWizard() {
                           <div className="text-right">
                             <div>Qty: {tagQty} | Overhead: {overhead}%</div>
                             <div className="text-sm text-muted-foreground">
-                              Unit: ₹{unitPrice} | Total: ₹{((tagQty * unitPrice) * (1 + overhead/100)).toFixed(2)}
+                              Unit: ₹{unitPrice} | Total: ₹{((tagQty * unitPrice) * (1 + overhead / 100)).toFixed(2)}
                             </div>
                           </div>
                         </div>
@@ -798,13 +841,12 @@ export function OrderWizard() {
             {steps.map((step, index) => (
               <div key={step.id} className="flex items-center">
                 <div
-                  className={`w-8 h-8 rounded-full flex items-center justify-center text-sm font-medium ${
-                    step.id === currentStep
-                      ? "bg-primary text-primary-foreground"
-                      : step.id < currentStep
+                  className={`w-8 h-8 rounded-full flex items-center justify-center text-sm font-medium ${step.id === currentStep
+                    ? "bg-primary text-primary-foreground"
+                    : step.id < currentStep
                       ? "bg-status-delivered text-status-delivered-bg"
                       : "bg-muted text-muted-foreground"
-                  }`}
+                    }`}
                 >
                   {step.id}
                 </div>
